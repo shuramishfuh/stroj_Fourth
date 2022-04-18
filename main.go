@@ -19,9 +19,16 @@ type Server struct {
 	bucket  string
 }
 
-func init() {
+var (
+	logger = logrus.New()
+)
 
-	logger := logrus.New()
+func init() {
+	// set environment variables
+	//os.Setenv("INTERN_WEBSERVER_PORT", "8080")
+	// 	os.Setenv("INTERN_PROMETHEUS_PORT", "8080")
+	// 	os.Setenv("INTERN_LOG_LEVEL", "INFO")
+
 	logger.Formatter = &logrus.JSONFormatter{}
 	logger.SetOutput(os.Stdout)
 	file, err := os.OpenFile("log.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
@@ -30,28 +37,16 @@ func init() {
 	}
 	defer file.Close()
 	logger.SetOutput(file)
+	logger.SetReportCaller(true)
 
 }
-
-// func createOrLoadLogFile(){
-//     f, err := os.OpenFile("main_err.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
-//
-//     if err != nil {
-//
-//         log.Fatalf("Encountered error opening log file: %v", err)
-//
-//     }
-//
-//     defer f.Close()
-//
-//     log.SetOutput(file)
-// }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.URL.Path[0] != '/' {
 		// TODO: log that we got an unexpected path - warning
-		fmt.Println("log that we got an unexpected path - warning")
+		fmt.Println("- warning  unexpected path ")
+		logger.Warningln("unexpected path")
 		http.NotFound(w, r)
 		return
 	}
@@ -63,31 +58,29 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, uplink.ErrObjectNotFound) {
 			// TODO: expected not found error - add debug logging
-			fmt.Println("expected not found error - add debug logging")
+			fmt.Println("add debug expected not found error  ")
+			logger.Debug("expected not found error")
 			http.NotFound(w, r)
 			return
 		}
 		// TODO: no idea what this error is, add error logging
 		fmt.Println("not expected ")
+		logger.Error("unexpected error")
 		http.Error(w, err.Error(), 500)
 		return
 	}
 	// TODO: add debug logging that we're serving a request
 	fmt.Println("serving")
+	logger.Debug("serving request")
 	ranger := objectranger.New(s.project, o, s.bucket)
 	httpranger.ServeContent(ctx, w, r, objectKey, o.System.Created, ranger)
 }
 
 func main() {
-	fmt.Println("expected not found error - add debug logging")
 	const (
 		access = `15D2da2YnRyWsNuJ4MBqDMh6MpE3EYB1CpvKKz74zUyStHwKqkDWM3eo7aRsUYm3KxwoUZPN6xAcrhifCmW9QHw1XvK5Jb4rHYTBsT2wAzhyitDUHNbvmuuTBvJcFHGGqxVjbdi8P6mAfZiDm5wNHqCUfQDNVRBRTvHcNRqnkwMUQ318GgF7jNgTWaoUrHCBatfd7mBXDtToCfHXs9ftJiwyoqNzowedbtcYLsXQRFvUm2yPsUCeDc1ZoQGxy5b3sUKYu6ETTuhH73ofGD1ttgsK2Sd98Z4ex9PRPqWL1DZQHcCtbSGTr8WTB8X4jwSfmpyooQ3UEswQyokUrdGJfLZ3z`
 		bucket = `intern-infra-web`
 	)
-
-	os.Setenv("INTERN_WEBSERVER_PORT", "8080")
-	// 	os.Setenv("INTERN_PROMETHEUS_PORT", "8080")
-	// 	os.Setenv("INTERN_LOG_LEVEL", "INFO")
 
 	webserverPort, err := strconv.Atoi(os.Getenv("INTERN_WEBSERVER_PORT"))
 	if err != nil {
